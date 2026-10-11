@@ -44,21 +44,14 @@ nowPlayingVideo.muted = true;
 //#endregion
 
 //#region Append CatJam to the media imagery
-// Wrap the cat in its own container that sits as a sibling AFTER
-// the album art, so animated covers can't wipe it via React re-renders.
-const catWrapper = document.createElement("div");
-catWrapper.classList.add("CatJamWrapper");
-catWrapper.append(videoElement);
-
 const appendCatJam = () => {
-  if (catWrapper.parentElement) return;
+  // Re-append if Tidal's React re-rendered and removed the element
+  if (videoElement.parentElement) return;
 
   const smallAlbumArt = document.querySelector(
     '[data-test="current-media-imagery"]',
   );
-  if (smallAlbumArt?.parentElement) {
-    smallAlbumArt.parentElement.insertBefore(catWrapper, smallAlbumArt.nextSibling);
-  }
+  if (smallAlbumArt) smallAlbumArt.append(videoElement);
 };
 
 // Watch for the now-playing view and append the second video there
@@ -85,7 +78,7 @@ appendNowPlayingCatJam();
 
 //#region Add CatJam to unloads
 unloads.add(() => {
-  catWrapper?.remove();
+  videoElement?.remove();
   nowPlayingVideo?.remove();
   observer.disconnect();
 });
