@@ -131,11 +131,19 @@ function getPlaybackRate(): number {
 }
 
 // Helper to sync both video elements together
+// play() rejects if the video can't load (bad URL, network drop) or is
+// interrupted by a pause; log it instead of throwing an uncaught error.
+const safePlay = (video: HTMLVideoElement) =>
+  video.play().catch((err: Error) => {
+    if (err.name !== "AbortError")
+      console.warn("[CAT-JAM] Video could not play:", video.src, err.message);
+  });
+
 function playBothVideos() {
   videoElement.currentTime = 0;
-  videoElement.play();
+  safePlay(videoElement);
   nowPlayingVideo.currentTime = 0;
-  nowPlayingVideo.play();
+  safePlay(nowPlayingVideo);
 }
 
 function pauseBothVideos() {
