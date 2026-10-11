@@ -44,26 +44,50 @@ nowPlayingVideo.muted = true;
 //#endregion
 
 //#region Append CatJam to the media imagery
+// A video detached from the page pauses; resume it in step with the music.
+const resumeIfPlaying = (video: HTMLVideoElement) => {
+  if (PlayState.playing) video.play().catch(() => {});
+};
+
 const appendCatJam = () => {
-  // Re-append if Tidal's React re-rendered and removed the element
-  if (videoElement.parentElement) return;
+  // Use isConnected, not parentElement: when Tidal replaces an ancestor,
+  // the video keeps its (now detached) parent, so a parentElement check
+  // would never re-append it.
+  if (videoElement.isConnected) return;
 
   const smallAlbumArt = document.querySelector(
     '[data-test="current-media-imagery"]',
   );
-  if (smallAlbumArt) smallAlbumArt.append(videoElement);
+  if (smallAlbumArt) {
+    smallAlbumArt.append(videoElement);
+    resumeIfPlaying(videoElement);
+  }
 };
 
-// Watch for the now-playing view and append the second video there
-const appendNowPlayingCatJam = () => {
-  if (nowPlayingVideo.parentElement) return;
-
-  const nowPlayingArt = document.querySelector(
-    '[data-test="now-playing-artwork"]',
+// With animated covers, the now-playing view hides the static artwork
+// wrapper and shows a separate animated-art <video> instead, so follow
+// whichever one is actually visible.
+const getNowPlayingTarget = (): Element | null => {
+  const animatedArt = document.querySelector(
+    '[data-test="new-now-playing"] video.rl-animated-art-visible',
   );
-  if (nowPlayingArt?.parentElement) {
-    nowPlayingArt.parentElement.append(nowPlayingVideo);
-  }
+  if (animatedArt?.parentElement) return animatedArt.parentElement;
+
+  return (
+    document.querySelector('[data-test="now-playing-artwork"]')
+      ?.parentElement ?? null
+  );
+};
+
+const appendNowPlayingCatJam = () => {
+  const target = getNowPlayingTarget();
+  if (!target) return;
+  if (nowPlayingVideo.isConnected && nowPlayingVideo.parentElement === target)
+    return;
+
+  target.append(nowPlayingVideo);
+  nowPlayingVideo.currentTime = videoElement.currentTime;
+  resumeIfPlaying(nowPlayingVideo);
 };
 
 // Single MutationObserver handles both — re-appends whichever got removed
