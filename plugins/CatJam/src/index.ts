@@ -46,7 +46,7 @@ nowPlayingVideo.muted = true;
 //#region Append CatJam to the media imagery
 // A video detached from the page pauses; resume it in step with the music.
 const resumeIfPlaying = (video: HTMLVideoElement) => {
-  if (PlayState.playing) video.play().catch(() => {});
+  if (PlayState.state === "PLAYING") video.play().catch(() => {});
 };
 
 const appendCatJam = () => {
@@ -105,6 +105,7 @@ unloads.add(() => {
   videoElement?.remove();
   nowPlayingVideo?.remove();
   observer.disconnect();
+  clearTimeout(pendingPlay);
 });
 //#endregion
 type AudioData = null | Root;
@@ -147,32 +148,44 @@ function setBothPlaybackRates(rate: number) {
   nowPlayingVideo.playbackRate = rate;
 }
 
-async function syncTiming(startTime: number, progress: number) {
-  if (videoElement) {
-    if (PlayState.playing) {
-      if (audioData?.audioAnalysis?.beats) {
-        const upcomingBeat = audioData.audioAnalysis.beats.find(
-          (beat) => beat.start > progress,
-        );
-        if (upcomingBeat) {
-          const operationTime = performance.now() - startTime;
-          const delayUntilNextBeat = Math.max(
-            0,
-            (upcomingBeat.start - progress) * 1000 - operationTime,
-          );
-          setTimeout(() => playBothVideos(), delayUntilNextBeat);
-        } else {
-          playBothVideos();
-        }
-        console.log("[CAT-JAM] Resynchronized to nearest beat");
-      } else {
-        playBothVideos();
-      }
-    } else {
-      pauseBothVideos();
-    }
+// A beat-aligned play scheduled for later. Cleared on pause so a stale
+// timer can't restart the cat after the music has stopped.
+let pendingPlay: ReturnType<typeof setTimeout> | undefined;
+
+function schedulePlay(delayMs: number) {
+  clearTimeout(pendingPlay);
+  pendingPlay = setTimeout(() => {
+    pendingPlay = undefined;
+    playBothVideos();
+  }, delayMs);
+}
+
+// `shouldPlay` is passed in rather than read from PlayState.playing: onState
+// fires before Redux applies the new state, and PlayState.playing reads
+// desiredPlaybackState, which can lag on the first play of a session.
+async function syncTiming(
+  startTime: number,
+  progress: number,
+  shouldPlay: boolean,
+) {
+  if (!shouldPlay) {
+    clearTimeout(pendingPlay);
+    pendingPlay = undefined;
+    pauseBothVideos();
+    return;
+  }
+
+  const upcomingBeat = audioData?.audioAnalysis?.beats?.find(
+    (beat) => beat.start > progress,
+  );
+  if (upcomingBeat) {
+    const operationTime = performance.now() - startTime;
+    schedulePlay(
+      Math.max(0, (upcomingBeat.start - progress) * 1000 - operationTime),
+    );
+    console.log("[CAT-JAM] Resynchronized to nearest beat");
   } else {
-    console.error("[CAT-JAM] videoElement element not found.");
+    playBothVideos();
   }
 }
 
@@ -232,14 +245,14 @@ const updateCatJam = async ({
             firstBeatStart * 1000 - operationTime,
           ); // Calculate delay until the first beat
 
-          setTimeout(() => playBothVideos(), delayUntilFirstBeat);
+          if (PlayState.state === "PLAYING") schedulePlay(delayUntilFirstBeat);
         }
       }
       break;
     }
     case "playbackState": {
       const startTime = performance.now();
-      syncTiming(startTime, lastProgress); // Synchronize video timing with the current progress
+      syncTiming(startTime, lastProgress, playbackState === "PLAYING");
       break;
     }
     case "load": {
@@ -249,7 +262,7 @@ const updateCatJam = async ({
       });
       await updateCatJam({
         type: "playbackState",
-        playbackState: PlayState.playing ? "PLAYING" : "PAUSED",
+        playbackState: PlayState.state,
       });
       break;
     }
@@ -281,11 +294,18 @@ ipcRenderer.on(unloads, "client.playback.playersignal", async (data) => {
   const currentTime = performance.now();
   const progress = Math.floor(Number(data.time));
 
-  // Check if a significant skip in progress has occurred or if a significant time has passed
-  if (Math.abs(progress - lastProgress) >= 2) {
-    syncTiming(currentTime, progress); // Synchronize video timing again
+  const delta = progress - lastProgress;
+
+  if (Math.abs(delta) >= 2) {
+    // Seek or new track: resync to the nearest beat
+    syncTiming(currentTime, progress, PlayState.state === "PLAYING");
+  } else if (delta > 0 && videoElement.paused && !pendingPlay) {
+    // Safety net: the song's clock is ticking forward normally, so music is
+    // playing. If the cat is still paused, a play/pause event was missed.
+    console.log("[CAT-JAM] Audio advancing but cat paused — resuming");
+    playBothVideos();
   }
-  lastProgress = progress; // Update last known progress
+  lastProgress = progress;
 });
 
 export { nowPlayingVideo };
