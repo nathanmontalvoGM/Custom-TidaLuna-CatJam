@@ -45,18 +45,17 @@ nowPlayingVideo.muted = true;
 
 //#region Append CatJam to the media imagery
 const appendCatJam = () => {
+  // Re-append if Tidal's React re-rendered and removed the element
+  if (videoElement.parentElement) return;
+
   const smallAlbumArt = document.querySelector(
     '[data-test="current-media-imagery"]',
   );
-  if (smallAlbumArt) return smallAlbumArt.append(videoElement);
-
-  return setTimeout(appendCatJam, 1);
+  if (smallAlbumArt) smallAlbumArt.append(videoElement);
 };
-appendCatJam();
 
 // Watch for the now-playing view and append the second video there
 const appendNowPlayingCatJam = () => {
-  // Already attached and in the DOM
   if (nowPlayingVideo.parentElement) return;
 
   const nowPlayingArt = document.querySelector(
@@ -67,10 +66,14 @@ const appendNowPlayingCatJam = () => {
   }
 };
 
-// Use a MutationObserver to detect when the now-playing view appears
-const observer = new MutationObserver(() => appendNowPlayingCatJam());
+// Single MutationObserver handles both — re-appends whichever got removed
+const observer = new MutationObserver(() => {
+  appendCatJam();
+  appendNowPlayingCatJam();
+});
 observer.observe(document.body, { childList: true, subtree: true });
-appendNowPlayingCatJam(); // Try immediately too
+appendCatJam();
+appendNowPlayingCatJam();
 //#endregion
 
 //#region Add CatJam to unloads
