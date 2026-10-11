@@ -37,7 +37,7 @@ videoElement.muted = true;
 // Second video element for the now-playing / mini player view
 const nowPlayingVideo: HTMLVideoElement = document.createElement("video");
 nowPlayingVideo.src = storage.activeVideoUrl;
-nowPlayingVideo.classList.add("CatJamNowPlaying");
+nowPlayingVideo.classList.add("CatJam", "CatJam--nowPlaying");
 nowPlayingVideo.style = `--catjam-opacity: ${storage.opacity / 100};`;
 nowPlayingVideo.loop = true;
 nowPlayingVideo.muted = true;
@@ -64,7 +64,9 @@ const appendNowPlayingCatJam = () => {
   );
   if (nowPlayingArt?.parentElement) {
     const parent = nowPlayingArt.parentElement;
+    // Ensure the parent is a positioning context and doesn't clip the overlay
     (parent as HTMLElement).style.position = "relative";
+    (parent as HTMLElement).style.overflow = "visible";
     parent.append(nowPlayingVideo);
   }
 };
