@@ -63,7 +63,11 @@ const appendNowPlayingCatJam = () => {
     '[data-test="now-playing-artwork"]',
   );
   if (nowPlayingArt?.parentElement) {
-    nowPlayingArt.parentElement.append(nowPlayingVideo);
+    const parent = nowPlayingArt.parentElement;
+    // Ensure the parent is a positioning context and doesn't clip the overlay
+    (parent as HTMLElement).style.position = "relative";
+    (parent as HTMLElement).style.overflow = "visible";
+    parent.append(nowPlayingVideo);
   }
 };
 
