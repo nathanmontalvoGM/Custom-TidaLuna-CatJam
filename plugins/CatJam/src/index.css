@@ -1,17 +1,25 @@
-.CatJam {
+.CatJamWrapper {
 	position: relative;
 	top: -52px;
 	left: -8px;
 	margin: 0 0 0 8px;
+	height: 0;
+	z-index: 10;
+	pointer-events: none;
+}
+
+.CatJam {
 	height: 52px;
 	opacity: var(--catjam-opacity);
 	border-radius: var(--wave-border-radius--extra-small);
-	z-index: 10;
+	pointer-events: auto;
 }
 
 @media (width <= 576px) {
-	.CatJam {
+	.CatJamWrapper {
 		top: -40px;
+	}
+	.CatJam {
 		height: 39.98px;
 	}
 }
