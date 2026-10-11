@@ -17,10 +17,10 @@
 
 .CatJam--nowPlaying {
 	position: absolute;
-	inset: 0;
+	bottom: 12px;
+	left: 12px;
+	top: auto;
 	margin: 0;
-	width: 100%;
-	height: 100%;
-	object-fit: cover;
+	height: 64px;
 	z-index: 10;
 }
