@@ -19,7 +19,7 @@ export const storage = await ReactiveStore.getPluginStorage("CatJam", {
 	] as VideoEntry[],
 });
 
-import element from ".";
+import element, { nowPlayingVideo } from ".";
 
 export const Settings = () => {
 	const [opacity, setOpacity] = React.useState(storage.opacity);
@@ -32,7 +32,9 @@ export const Settings = () => {
 	const [error, setError] = React.useState("");
 
 	const onOpacityChange = React.useCallback((value: number) => {
-		element.style = `--catjam-opacity: ${value / 100};`;
+		const opacityStyle = `--catjam-opacity: ${value / 100};`;
+		element.style = opacityStyle;
+		nowPlayingVideo.style = opacityStyle;
 		setOpacity((storage.opacity = value));
 	}, []);
 
@@ -41,6 +43,7 @@ export const Settings = () => {
 			storage.activeVideoUrl = url;
 			setActiveUrl(url);
 			element.src = url;
+			nowPlayingVideo.src = url;
 		},
 		[],
 	);

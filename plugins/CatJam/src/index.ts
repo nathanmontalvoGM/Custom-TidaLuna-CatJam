@@ -29,6 +29,14 @@ videoElement.style = `--catjam-opacity: ${storage.opacity / 100};`;
 
 videoElement.loop = true;
 videoElement.muted = true;
+
+// Second video element for the now-playing / mini player view
+const nowPlayingVideo: HTMLVideoElement = document.createElement("video");
+nowPlayingVideo.src = storage.activeVideoUrl;
+nowPlayingVideo.classList.add("CatJam", "CatJam--nowPlaying");
+nowPlayingVideo.style = `--catjam-opacity: ${storage.opacity / 100};`;
+nowPlayingVideo.loop = true;
+nowPlayingVideo.muted = true;
 //#endregion
 
 //#region Append CatJam to the media imagery
@@ -41,10 +49,32 @@ const appendCatJam = () => {
   return setTimeout(appendCatJam, 1);
 };
 appendCatJam();
+
+// Watch for the now-playing view and append the second video there
+const appendNowPlayingCatJam = () => {
+  // Already attached and in the DOM
+  if (nowPlayingVideo.parentElement) return;
+
+  const nowPlayingArt = document.querySelector(
+    '[data-test="now-playing-artwork"]',
+  );
+  if (nowPlayingArt?.parentElement) {
+    nowPlayingArt.parentElement.append(nowPlayingVideo);
+  }
+};
+
+// Use a MutationObserver to detect when the now-playing view appears
+const observer = new MutationObserver(() => appendNowPlayingCatJam());
+observer.observe(document.body, { childList: true, subtree: true });
+appendNowPlayingCatJam(); // Try immediately too
 //#endregion
 
 //#region Add CatJam to unloads
-unloads.add(() => videoElement?.remove());
+unloads.add(() => {
+  videoElement?.remove();
+  nowPlayingVideo?.remove();
+  observer.disconnect();
+});
 //#endregion
 type AudioData = null | Root;
 let audioData: AudioData = null;
@@ -68,38 +98,47 @@ function getPlaybackRate(): number {
   }
 }
 
+// Helper to sync both video elements together
+function playBothVideos() {
+  videoElement.currentTime = 0;
+  videoElement.play();
+  nowPlayingVideo.currentTime = 0;
+  nowPlayingVideo.play();
+}
+
+function pauseBothVideos() {
+  videoElement.pause();
+  nowPlayingVideo.pause();
+}
+
+function setBothPlaybackRates(rate: number) {
+  videoElement.playbackRate = rate;
+  nowPlayingVideo.playbackRate = rate;
+}
+
 async function syncTiming(startTime: number, progress: number) {
   if (videoElement) {
     if (PlayState.playing) {
-      //progress = progress / 1000; // Convert progress from milliseconds to seconds
-
       if (audioData?.audioAnalysis?.beats) {
-        // Find the nearest upcoming beat based on current progress
         const upcomingBeat = audioData.audioAnalysis.beats.find(
           (beat) => beat.start > progress,
         );
         if (upcomingBeat) {
-          const operationTime = performance.now() - startTime; // Time taken for the operation
+          const operationTime = performance.now() - startTime;
           const delayUntilNextBeat = Math.max(
             0,
             (upcomingBeat.start - progress) * 1000 - operationTime,
-          ); // Calculate delay until the next beat
-
-          setTimeout(() => {
-            videoElement.currentTime = 0; // Reset videoElement to start
-            videoElement.play(); // Play the videoElement
-          }, delayUntilNextBeat);
+          );
+          setTimeout(() => playBothVideos(), delayUntilNextBeat);
         } else {
-          videoElement.currentTime = 0; // Reset videoElement to start if no upcoming beat
-          videoElement.play();
+          playBothVideos();
         }
         console.log("[CAT-JAM] Resynchronized to nearest beat");
       } else {
-        videoElement.currentTime = 0; // Play the videoElement without delay if no beat information
-        videoElement.play();
+        playBothVideos();
       }
     } else {
-      videoElement.pause(); // Pause the videoElement if Spotify is not playing
+      pauseBothVideos();
     }
   } else {
     console.error("[CAT-JAM] videoElement element not found.");
@@ -154,7 +193,7 @@ const updateCatJam = async ({
           const firstBeatStart = audioData.audioAnalysis.beats[0].start; // Get start time of the first beat
 
           // Adjust video playback rate based on the song's BPM
-          videoElement.playbackRate = getPlaybackRate();
+          setBothPlaybackRates(getPlaybackRate());
 
           const operationTime = performance.now() - startTime; // Calculate time taken for operations
           const delayUntilFirstBeat = Math.max(
@@ -162,10 +201,7 @@ const updateCatJam = async ({
             firstBeatStart * 1000 - operationTime,
           ); // Calculate delay until the first beat
 
-          setTimeout(() => {
-            videoElement.currentTime = 0; // Ensure video starts from the beginning
-            videoElement.play(); // Play the video
-          }, delayUntilFirstBeat);
+          setTimeout(() => playBothVideos(), delayUntilFirstBeat);
         }
       }
       break;
@@ -221,4 +257,5 @@ ipcRenderer.on(unloads, "client.playback.playersignal", async (data) => {
   lastProgress = progress; // Update last known progress
 });
 
+export { nowPlayingVideo };
 export default videoElement;
