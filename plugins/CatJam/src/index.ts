@@ -19,6 +19,10 @@ import { Root } from "./types";
 new StyleTag("CatJam", unloads, css).add();
 //#endregion
 
+// Log what storage loaded on startup (helps debug persistence)
+console.log("[CAT-JAM] Storage loaded — activeVideoUrl:", storage.activeVideoUrl);
+console.log("[CAT-JAM] Storage loaded — videoLibrary:", JSON.parse(JSON.stringify(storage.videoLibrary)));
+
 //#region CatJam videoElement Element
 const videoElement: HTMLVideoElement = document.createElement("video");
 

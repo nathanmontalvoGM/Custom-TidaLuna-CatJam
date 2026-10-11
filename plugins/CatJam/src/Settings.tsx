@@ -24,9 +24,14 @@ import element, { nowPlayingVideo } from ".";
 export const Settings = () => {
 	const [opacity, setOpacity] = React.useState(storage.opacity);
 	const [activeUrl, setActiveUrl] = React.useState(storage.activeVideoUrl);
-	const [library, setLibrary] = React.useState<VideoEntry[]>(
-		storage.videoLibrary,
-	);
+	const [library, setLibrary] = React.useState<VideoEntry[]>(() => {
+		// Read from storage and clone to get plain objects (strip proxy wrappers)
+		const stored = storage.videoLibrary;
+		if (Array.isArray(stored) && stored.length > 0) {
+			return stored.map((v: VideoEntry) => ({ name: String(v.name), url: String(v.url) }));
+		}
+		return [{ name: "CatJam (default)", url: DEFAULT_VIDEO_URL }];
+	});
 	const [newName, setNewName] = React.useState("");
 	const [newUrl, setNewUrl] = React.useState("");
 	const [error, setError] = React.useState("");
@@ -38,12 +43,19 @@ export const Settings = () => {
 		setOpacity((storage.opacity = value));
 	}, []);
 
+	// Strip oby proxy wrappers before writing to IndexedDB.
+	// Reactive proxies can interfere with IndexedDB's structured clone,
+	// so we create plain objects to guarantee persistence.
+	const cloneLibrary = (lib: VideoEntry[]): VideoEntry[] =>
+		lib.map((v) => ({ name: String(v.name), url: String(v.url) }));
+
 	const selectVideo = React.useCallback(
 		(url: string) => {
 			storage.activeVideoUrl = url;
 			setActiveUrl(url);
 			element.src = url;
 			nowPlayingVideo.src = url;
+			console.log("[CAT-JAM] Selected video:", url);
 		},
 		[],
 	);
@@ -70,23 +82,25 @@ export const Settings = () => {
 		}
 
 		const entry: VideoEntry = { name: trimmedName, url: trimmedUrl };
-		const updated = [...library, entry];
+		const updated = cloneLibrary([...library, entry]);
 		storage.videoLibrary = updated;
 		setLibrary(updated);
 		setNewName("");
 		setNewUrl("");
 		setError("");
+		console.log("[CAT-JAM] Video added, library now:", updated);
 	}, [newName, newUrl, library]);
 
 	const removeVideo = React.useCallback(
 		(url: string) => {
-			const updated = library.filter((v) => v.url !== url);
+			const updated = cloneLibrary(library.filter((v) => v.url !== url));
 			storage.videoLibrary = updated;
 			setLibrary(updated);
 			// If the removed video was active, fall back to default
 			if (activeUrl === url) {
 				selectVideo(DEFAULT_VIDEO_URL);
 			}
+			console.log("[CAT-JAM] Video removed, library now:", updated);
 		},
 		[library, activeUrl, selectVideo],
 	);
