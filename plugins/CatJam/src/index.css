@@ -6,6 +6,7 @@
 	height: 52px;
 	opacity: var(--catjam-opacity);
 	border-radius: var(--wave-border-radius--extra-small);
+	z-index: 10;
 }
 
 @media (width <= 576px) {
