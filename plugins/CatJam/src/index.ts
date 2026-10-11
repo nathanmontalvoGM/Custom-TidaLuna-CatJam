@@ -22,8 +22,7 @@ new StyleTag("CatJam", unloads, css).add();
 //#region CatJam videoElement Element
 const videoElement: HTMLVideoElement = document.createElement("video");
 
-videoElement.src =
-  "https://cdn.jsdelivr.net/gh/wont-stream/neptune-plugins@dev/plugins/Catto/src/catjam.webm";
+videoElement.src = storage.activeVideoUrl;
 
 videoElement.classList.add("CatJam");
 videoElement.style = `--catjam-opacity: ${storage.opacity / 100};`;
@@ -51,100 +50,22 @@ type AudioData = null | Root;
 let audioData: AudioData = null;
 
 const videoElementDefaultBPM = 135.48;
-async function getPlaybackRate() {
-  if (audioData && audioData?.audioFeatures?.tempo) {
-    let trackBPM = audioData?.audioFeatures?.tempo; // BPM of the current track
-    let bpmToUse = await getBetterBPM(trackBPM);
-    let playbackRate = 1;
-    if (bpmToUse) {
-      playbackRate = bpmToUse / videoElementDefaultBPM;
-    }
+function getPlaybackRate(): number {
+  if (audioData?.audioFeatures?.tempo) {
+    const trackBPM = audioData.audioFeatures.tempo;
+    const playbackRate = trackBPM / videoElementDefaultBPM;
     console.log("[CAT-JAM] Track BPM:", trackBPM);
     console.log(
       "[CAT-JAM] Cat jam synchronized, playback rate set to:",
       playbackRate,
     );
-
-    return playbackRate; // Return the calculated playback rate
+    return playbackRate;
   } else {
     console.warn(
       "[CAT-JAM] BPM data not available for this track, cat will not be jamming accurately :(",
     );
-    return 1; // Return default playback rate if BPM data is not available
+    return 1;
   }
-}
-
-async function getBetterBPM(currentBPM: number) {
-  let betterBPM = currentBPM;
-  try {
-    if (audioData?.audioFeatures) {
-      const danceability = Math.round(
-        100 * audioData.audioFeatures.danceability,
-      );
-      const energy = Math.round(100 * audioData.audioFeatures.energy);
-      betterBPM = calculateBetterBPM(danceability, energy, currentBPM);
-    }
-  } catch (error) {
-    console.error("[CAT-JAM] Could not get audio features: ", error);
-  } finally {
-    return betterBPM;
-  }
-}
-
-const energyTreshold = 0.5;
-const danceabilityTreshold = 0.5;
-const maxBPM = 100;
-const bpmThreshold = 0.8; // 80 bpm
-function calculateBetterBPM(
-  danceability: number,
-  energy: number,
-  currentBPM: number,
-) {
-  let danceabilityWeight = 0.9;
-  let energyWeight = 0.6;
-  let bpmWeight = 0.6;
-
-  const normalizedBPM = currentBPM / 100;
-  const normalizedDanceability = danceability / 100;
-  const normalizedEnergy = energy / 100;
-
-  if (normalizedDanceability < danceabilityTreshold) {
-    danceabilityWeight *= normalizedDanceability;
-  }
-
-  if (normalizedEnergy < energyTreshold) {
-    energyWeight *= normalizedEnergy;
-  }
-  // increase bpm weight if the song is slow
-  if (normalizedBPM < bpmThreshold) {
-    bpmWeight = 0.9;
-  }
-
-  const weightedAverage =
-    (normalizedDanceability * danceabilityWeight +
-      normalizedEnergy * energyWeight +
-      normalizedBPM * bpmWeight) /
-    (1 - danceabilityWeight + 1 - energyWeight + bpmWeight);
-  let betterBPM = weightedAverage * maxBPM;
-
-  console.log({
-    danceabilityWeight,
-    energyWeight,
-    currentBPM,
-    weightedAverage,
-    betterBPM,
-    bpmWeight,
-  });
-
-  if (betterBPM > currentBPM) {
-    betterBPM = (betterBPM + currentBPM) / 2;
-  }
-
-  if (betterBPM < currentBPM) {
-    betterBPM = Math.max(betterBPM, 70);
-  }
-
-  return betterBPM;
 }
 
 async function syncTiming(startTime: number, progress: number) {
@@ -233,7 +154,7 @@ const updateCatJam = async ({
           const firstBeatStart = audioData.audioAnalysis.beats[0].start; // Get start time of the first beat
 
           // Adjust video playback rate based on the song's BPM
-          videoElement.playbackRate = await getPlaybackRate();
+          videoElement.playbackRate = getPlaybackRate();
 
           const operationTime = performance.now() - startTime; // Calculate time taken for operations
           const delayUntilFirstBeat = Math.max(
